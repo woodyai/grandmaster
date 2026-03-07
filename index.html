@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Grand Master — AI Airdrop Agent | Pharos × TopNod</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏛️</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<style>*{box-sizing:border-box;margin:0;padding:0}body{background:#06080f;overflow-x:hidden}</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+
+const C = {
+  bg: "#06080f", panel: "#111827", surface: "#161d2e", surfaceLight: "#1c2540",
+  accent: "#00e6a0", accentDim: "#00c98a", accentMuted: "rgba(0,230,160,0.12)",
+  purple: "#8b5cf6", purpleMuted: "rgba(139,92,246,0.12)",
+  orange: "#f59e0b", orangeMuted: "rgba(245,158,11,0.12)",
+  pink: "#ec4899", blue: "#3b82f6",
+  text: "#e4e8f1", dim: "#6b7a94", muted: "#3d4a5e",
+  border: "#1a2236", borderLight: "#232f47",
+  white: "#fff", black: "#000", success: "#22c55e",
+};
+const FONT = "'Outfit','DM Sans',-apple-system,sans-serif";
+const MONO = "'JetBrains Mono',monospace";
+
+const GM_AVATAR = "🏛️";
+const GM_NAME = "Grand Master";
+const GM_HANDLE = "@PharosGrandMaster";
+
+const DAILY_CHALLENGE = {
+  question: "If every human had an AI agent managing their money, would banks still exist in 2035?",
+  reward: "Top 10 answers split 200 $PROS",
+  timeLeft: "4h 23m left",
+  replies: 147,
+  theme: "Daily Riddle #12",
+};
+
+const SAMPLE_CONVERSATIONS = [
+  {
+    user: { name: "cryptoNomad", handle: "@cryptoNomad_", avatar: "🧭" },
+    msg: "I've been building on Pharos testnet since May. Every DApp, every swap, every governance vote. I'm not here for a quick flip — I want to be part of the RWA revolution.",
+    gmReply: "847 testnet transactions. 12 governance votes. You walk the walk. Here's 35 $PROS. Don't make me regret it.",
+    reward: 35, score: 91,
+  },
+  {
+    user: { name: "web3sarah", handle: "@web3sarah_eth", avatar: "✨" },
+    msg: "I deserve $PROS because... I really want it? Please? 🥺",
+    gmReply: "\"I really want it\" is not a thesis. Come back when you have one. Next.",
+    reward: 0, score: 12, roast: true,
+  },
+  {
+    user: { name: "defi_architect", handle: "@defi_architect", avatar: "🏗️" },
+    msg: "Banks won't disappear. They'll become middleware — invisible infrastructure that AI agents interact with on behalf of humans. The question isn't banks vs crypto. It's who owns the agent.",
+    gmReply: "THIS is why I exist. The ownership question is the real question. 50 $PROS. Best answer today so far.",
+    reward: 50, score: 97,
+  },
+];
+
+const LEADERBOARD = [
+  { rank: 1, addr: "0x7a3f...e82d", points: 847, narrative: "Full sweep + 5 referrals. The one to beat.", path: "Dual" },
+  { rank: 2, addr: "0xb91c...4f2a", points: 723, narrative: "Quiet but deadly. Never missed a day.", path: "Action" },
+  { rank: 3, addr: "0x2d8e...9c1b", points: 691, narrative: "Earned a surprise bonus at 4AM.", path: "Action" },
+  { rank: 4, addr: "0xf4c1...3a7e", points: 584, narrative: "Convinced the Master 3 times this week.", path: "Convince" },
+  { rank: 5, addr: "0x91ab...2f8c", points: 512, narrative: "Rising star. Joined 2 days ago, already top 5.", path: "Dual" },
+];
+
+const WEIGHT_DATA = [
+  { task: "Referral", weight: "3x", icon: "👥", hot: true },
+  { task: "Daily Prediction", weight: "2x", icon: "🎯", hot: false },
+  { task: "Swap", weight: "1.5x", icon: "🔄", hot: false },
+  { task: "Check-in", weight: "1x", icon: "✅", hot: false },
+  { task: "LP Provision", weight: "2x", icon: "💧", hot: false },
+];
+
+const STYLES = `
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}body{background:${C.bg}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes modalIn{from{opacity:0;transform:scale(.97) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes overlayIn{from{opacity:0}to{opacity:1}}
+@keyframes typing{0%{width:0}100%{width:100%}}
+@keyframes blink{0%,100%{border-color:${C.accent}}50%{border-color:transparent}}
+@keyframes countDown{from{opacity:1}to{opacity:.6}}
+@keyframes slideIn{from{opacity:0;transform:translateX(-16px)}to{opacity:1;transform:translateX(0)}}
+@keyframes glowPulse{0%,100%{box-shadow:0 0 20px rgba(0,230,160,.12)}50%{box-shadow:0 0 35px rgba(0,230,160,.25)}}
+`;
+
+function PoolCounter({ remaining }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+      <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: C.success, animation: "pulse 1.5s infinite" }} />
+      <span style={{ fontSize: "11px", color: C.dim, fontFamily: MONO }}>Pool: </span>
+      <span style={{ fontSize: "13px", color: C.accent, fontWeight: 700, fontFamily: MONO }}>${remaining.toLocaleString()}</span>
+      <span style={{ fontSize: "11px", color: C.dim }}> remaining</span>
+    </div>
+  );
+}
+
+function TweetCard({ conv, delay = 0 }) {
+  const isRoast = conv.roast;
+  return (
+    <div style={{
+      background: C.surface, borderRadius: "16px", padding: "20px",
+      border: `1px solid ${isRoast ? C.pink + "30" : conv.reward > 30 ? C.accent + "30" : C.border}`,
+      animation: `fadeUp .5s ease ${delay}s both`,
+    }}>
+      {/* User tweet */}
+      <div style={{ display: "flex", gap: "12px", marginBottom: "16px" }}>
+        <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: C.surfaceLight, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", flexShrink: 0 }}>{conv.user.avatar}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+            <span style={{ fontSize: "13px", fontWeight: 700, color: C.white }}>{conv.user.name}</span>
+            <span style={{ fontSize: "12px", color: C.muted }}>{conv.user.handle}</span>
+          </div>
+          <p style={{ fontSize: "13px", color: C.text, lineHeight: 1.6, margin: 0 }}>{conv.msg}</p>
+        </div>
+      </div>
+
+      {/* GM reply */}
+      <div style={{
+        marginLeft: "20px", padding: "16px", borderRadius: "12px",
+        background: isRoast ? `${C.pink}08` : `${C.accent}08`,
+        borderLeft: `3px solid ${isRoast ? C.pink : C.accent}`,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+          <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: `linear-gradient(135deg,${C.accent}30,${C.purple}30)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px" }}>{GM_AVATAR}</div>
+          <span style={{ fontSize: "12px", fontWeight: 700, color: C.accent }}>{GM_NAME}</span>
+          <span style={{ fontSize: "11px", color: C.muted }}>{GM_HANDLE}</span>
+        </div>
+        <p style={{ fontSize: "13px", color: isRoast ? C.pink : C.text, lineHeight: 1.6, margin: 0, fontStyle: isRoast ? "normal" : "normal" }}>{conv.gmReply}</p>
+        {conv.reward > 0 && (
+          <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", marginTop: "10px", padding: "4px 12px", borderRadius: "20px", background: C.accentMuted, border: `1px solid ${C.accent}30` }}>
+            <span style={{ fontSize: "11px", color: C.accent, fontWeight: 700 }}>💰 {conv.reward} $PROS sent</span>
+          </div>
+        )}
+        {isRoast && (
+          <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", marginTop: "10px", padding: "4px 12px", borderRadius: "20px", background: `${C.pink}15`, border: `1px solid ${C.pink}30` }}>
+            <span style={{ fontSize: "11px", color: C.pink, fontWeight: 600 }}>🔥 Roasted — 0 $PROS</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [modal, setModal] = useState(null); // null | "convince" | "leaderboard"
+  const [poolRemaining, setPoolRemaining] = useState(38420);
+  const [userInput, setUserInput] = useState("");
+  const [chatHistory, setChatHistory] = useState([]);
+  const [isTyping, setIsTyping] = useState(false);
+  const [tab, setTab] = useState("feed"); // "feed" | "challenge" | "myScore"
+  const chatEndRef = useRef(null);
+
+  useEffect(() => {
+    const t = setInterval(() => setPoolRemaining(p => Math.max(p - Math.floor(Math.random() * 3), 30000)), 8000);
+    return () => clearInterval(t);
+  }, []);
+
+  const handleSendMessage = () => {
+    if (!userInput.trim() || isTyping) return;
+    const msg = userInput.trim();
+    setChatHistory(prev => [...prev, { role: "user", text: msg }]);
+    setUserInput("");
+    setIsTyping(true);
+
+    setTimeout(() => {
+      const responses = [
+        { text: "Interesting pitch. But I've heard similar words from 200 people today. What makes YOU different? Give me specifics — what have you actually done on Pharos?", reward: 0 },
+        { text: "I checked your wallet. 23 testnet transactions, 2 governance votes. That's more than most. But I need to see consistency, not a one-week sprint. Come back after 7 consecutive days and I'll have something for you.", reward: 0 },
+        { text: "Now THAT caught my attention. Your understanding of the RWA thesis is sharper than 90% of what I see. Here's 18 $PROS. Keep building, and there's more where that came from.", reward: 18 },
+        { text: "Let me be direct — copying someone else's pitch and adding emojis doesn't impress me. I've seen this exact message 4 times today. Original thoughts only.", reward: 0 },
+        { text: "Bold take. I don't fully agree, but you argued it well and backed it with data. That's rare. 25 $PROS for intellectual honesty.", reward: 25 },
+      ];
+      const r = responses[Math.floor(Math.random() * responses.length)];
+      setChatHistory(prev => [...prev, { role: "gm", text: r.text, reward: r.reward }]);
+      if (r.reward > 0) setPoolRemaining(p => p - r.reward);
+      setIsTyping(false);
+    }, 2000 + Math.random() * 1500);
+  };
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatHistory, isTyping]);
+
+  const renderConvinceModal = () => (
+    <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", animation: "overlayIn .3s" }}>
+      <div style={{ width: 720, maxHeight: "90vh", background: C.panel, borderRadius: "20px", border: `1px solid ${C.border}`, boxShadow: "0 32px 80px rgba(0,0,0,.6)", animation: "modalIn .4s ease", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        {/* Header */}
+        <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div style={{ width: "44px", height: "44px", borderRadius: "50%", background: `linear-gradient(135deg,${C.accent}25,${C.purple}25)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", border: `2px solid ${C.accent}30` }}>{GM_AVATAR}</div>
+            <div>
+              <div style={{ fontSize: "16px", fontWeight: 700, color: C.white }}>{GM_NAME}</div>
+              <div style={{ fontSize: "11px", color: C.dim }}>{GM_HANDLE} · AI Airdrop Judge</div>
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <PoolCounter remaining={poolRemaining} />
+            <button onClick={() => { setModal(null); setChatHistory([]); }} style={{ width: "32px", height: "32px", borderRadius: "50%", background: C.surface, border: `1px solid ${C.border}`, cursor: "pointer", color: C.dim, fontSize: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: "flex", borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+          {[
+            { id: "feed", label: "Live Feed" },
+            { id: "challenge", label: `Today's Challenge` },
+            { id: "myScore", label: "Try It Yourself" },
+          ].map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} style={{
+              flex: 1, padding: "12px", fontSize: "13px", fontWeight: tab === t.id ? 700 : 500,
+              color: tab === t.id ? C.accent : C.dim, background: "transparent", border: "none",
+              borderBottom: tab === t.id ? `2px solid ${C.accent}` : "2px solid transparent",
+              cursor: "pointer", fontFamily: FONT, transition: "all .2s",
+            }}>{t.label}</button>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div style={{ flex: 1, overflow: "auto", padding: "20px 24px" }}>
+          {tab === "feed" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div style={{ fontSize: "12px", color: C.dim, marginBottom: "4px" }}>Recent interactions — all public on 𝕏</div>
+              {SAMPLE_CONVERSATIONS.map((conv, i) => <TweetCard key={i} conv={conv} delay={i * 0.15} />)}
+            </div>
+          )}
+
+          {tab === "challenge" && (
+            <div style={{ animation: "fadeUp .4s ease" }}>
+              <div style={{
+                background: `linear-gradient(135deg,${C.purpleMuted},${C.accentMuted})`,
+                borderRadius: "16px", padding: "24px", border: `1px solid ${C.purple}25`, marginBottom: "20px",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                  <span style={{ fontSize: "11px", color: C.purple, fontWeight: 600, letterSpacing: "1px", textTransform: "uppercase" }}>{DAILY_CHALLENGE.theme}</span>
+                  <span style={{ fontSize: "11px", color: C.orange, fontWeight: 600 }}>⏳ {DAILY_CHALLENGE.timeLeft}</span>
+                </div>
+                <p style={{ fontSize: "18px", fontWeight: 700, color: C.white, lineHeight: 1.5, margin: "0 0 16px" }}>"{DAILY_CHALLENGE.question}"</p>
+                <div style={{ display: "flex", gap: "16px" }}>
+                  <span style={{ fontSize: "12px", color: C.accent }}>🏆 {DAILY_CHALLENGE.reward}</span>
+                  <span style={{ fontSize: "12px", color: C.dim }}>💬 {DAILY_CHALLENGE.replies} replies</span>
+                </div>
+              </div>
+
+              <div style={{ padding: "16px", background: C.surface, borderRadius: "12px", border: `1px solid ${C.border}` }}>
+                <div style={{ fontSize: "12px", color: C.dim, marginBottom: "8px" }}>Grand Master's note:</div>
+                <p style={{ fontSize: "13px", color: C.text, lineHeight: 1.6, margin: 0, fontStyle: "italic" }}>
+                  "I've read 147 replies so far. Most people say 'no banks will die.' Boring. I want the answer that makes me think differently. Surprise me."
+                </p>
+              </div>
+            </div>
+          )}
+
+          {tab === "myScore" && (
+            <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+              {/* Chat area */}
+              <div style={{ flex: 1, marginBottom: "16px" }}>
+                {chatHistory.length === 0 && (
+                  <div style={{ textAlign: "center", padding: "40px 20px", animation: "fadeIn .5s" }}>
+                    <div style={{ fontSize: "40px", marginBottom: "12px" }}>{GM_AVATAR}</div>
+                    <div style={{ fontSize: "16px", fontWeight: 700, color: C.white, marginBottom: "8px" }}>Convince the Grand Master</div>
+                    <div style={{ fontSize: "13px", color: C.dim, lineHeight: 1.6, maxWidth: "400px", margin: "0 auto" }}>
+                      Tell me why you deserve extra $PROS. I'll check your wallet, verify your claims, and judge your conviction. No templates. No BS.
+                    </div>
+                    <div style={{ display: "flex", gap: "8px", justifyContent: "center", marginTop: "20px", flexWrap: "wrap" }}>
+                      {["Why I believe in Pharos", "My testnet contributions", "Challenge: AI vs banks"].map((prompt, i) => (
+                        <button key={i} onClick={() => setUserInput(prompt === "Why I believe in Pharos" ? "I believe Pharos will become the leading RWA chain because..." : prompt === "My testnet contributions" ? "I've been on the testnet for 3 months, here's what I've done..." : "I think AI will fundamentally change banking because...")} style={{
+                          padding: "8px 14px", background: C.surface, border: `1px solid ${C.border}`,
+                          borderRadius: "20px", cursor: "pointer", color: C.dim, fontSize: "11px",
+                          fontFamily: FONT, transition: "all .2s",
+                        }}>{prompt}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {chatHistory.map((msg, i) => (
+                  <div key={i} style={{
+                    display: "flex", gap: "10px", marginBottom: "14px",
+                    animation: `slideIn .3s ease`,
+                    flexDirection: msg.role === "user" ? "row-reverse" : "row",
+                  }}>
+                    <div style={{
+                      width: "32px", height: "32px", borderRadius: "50%", flexShrink: 0,
+                      background: msg.role === "user" ? `linear-gradient(135deg,${C.purple},${C.accent})` : `linear-gradient(135deg,${C.accent}25,${C.purple}25)`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: msg.role === "user" ? "14px" : "16px",
+                      border: msg.role === "gm" ? `2px solid ${C.accent}30` : "none",
+                    }}>{msg.role === "user" ? "👤" : GM_AVATAR}</div>
+                    <div style={{
+                      maxWidth: "80%", padding: "12px 16px", borderRadius: "14px",
+                      background: msg.role === "user" ? C.purple + "20" : C.surface,
+                      border: `1px solid ${msg.role === "user" ? C.purple + "30" : C.border}`,
+                    }}>
+                      <p style={{ fontSize: "13px", color: C.text, lineHeight: 1.6, margin: 0 }}>{msg.text}</p>
+                      {msg.reward > 0 && (
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", marginTop: "8px", padding: "3px 10px", borderRadius: "12px", background: C.accentMuted }}>
+                          <span style={{ fontSize: "11px", color: C.accent, fontWeight: 700 }}>💰 {msg.reward} $PROS awarded</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {isTyping && (
+                  <div style={{ display: "flex", gap: "10px", animation: "fadeIn .3s" }}>
+                    <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: `linear-gradient(135deg,${C.accent}25,${C.purple}25)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", border: `2px solid ${C.accent}30` }}>{GM_AVATAR}</div>
+                    <div style={{ padding: "12px 16px", background: C.surface, borderRadius: "14px", border: `1px solid ${C.border}` }}>
+                      <div style={{ display: "flex", gap: "4px" }}>
+                        {[0, 1, 2].map(i => <div key={i} style={{ width: "6px", height: "6px", borderRadius: "50%", background: C.accent, animation: `pulse 1s ease infinite`, animationDelay: `${i * 0.2}s` }} />)}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Input (only for myScore tab) */}
+        {tab === "myScore" && (
+          <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.border}`, flexShrink: 0 }}>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <input
+                value={userInput}
+                onChange={e => setUserInput(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleSendMessage()}
+                placeholder="Make your case to the Grand Master..."
+                style={{
+                  flex: 1, padding: "12px 16px", background: C.surface, border: `1px solid ${C.border}`,
+                  borderRadius: "12px", color: C.text, fontSize: "13px", fontFamily: FONT,
+                  outline: "none",
+                }}
+              />
+              <button onClick={handleSendMessage} disabled={isTyping || !userInput.trim()} style={{
+                padding: "12px 20px", background: isTyping || !userInput.trim() ? C.surface : `linear-gradient(135deg,${C.accent},${C.accentDim})`,
+                border: "none", borderRadius: "12px", cursor: isTyping ? "wait" : "pointer",
+                color: isTyping || !userInput.trim() ? C.muted : C.black, fontSize: "13px", fontWeight: 700, fontFamily: FONT,
+              }}>Send</button>
+            </div>
+            <div style={{ fontSize: "10px", color: C.muted, marginTop: "6px" }}>
+              ⚠️ Prototype demo — real version runs on 𝕏 as public replies to {GM_HANDLE}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderLeaderboardModal = () => (
+    <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", animation: "overlayIn .3s" }}>
+      <div style={{ width: 640, maxHeight: "85vh", background: C.panel, borderRadius: "20px", border: `1px solid ${C.border}`, boxShadow: "0 32px 80px rgba(0,0,0,.6)", animation: "modalIn .4s ease", overflow: "hidden" }}>
+        {/* Header */}
+        <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: "18px", fontWeight: 700, color: C.white }}>Action Leaderboard</div>
+            <div style={{ fontSize: "11px", color: C.dim, marginTop: "2px" }}>Narrated by the Grand Master</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <PoolCounter remaining={poolRemaining} />
+            <button onClick={() => setModal(null)} style={{ width: "32px", height: "32px", borderRadius: "50%", background: C.surface, border: `1px solid ${C.border}`, cursor: "pointer", color: C.dim, fontSize: "16px", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+          </div>
+        </div>
+
+        {/* Weight strip */}
+        <div style={{ padding: "14px 24px", background: C.surface, borderBottom: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: "11px", color: C.orange, fontWeight: 600, marginBottom: "8px" }}>⚡ Current Task Weights (updates in 2h 14m)</div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            {WEIGHT_DATA.map((w, i) => (
+              <div key={i} style={{
+                flex: 1, padding: "8px 6px", background: C.panel, borderRadius: "8px", textAlign: "center",
+                border: `1px solid ${w.hot ? C.orange + "40" : C.border}`,
+              }}>
+                <div style={{ fontSize: "14px", marginBottom: "2px" }}>{w.icon}</div>
+                <div style={{ fontSize: "10px", color: C.dim }}>{w.task}</div>
+                <div style={{ fontSize: "13px", fontWeight: 700, color: w.hot ? C.orange : C.text }}>{w.weight}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Leaderboard */}
+        <div style={{ padding: "20px 24px", overflow: "auto", maxHeight: "50vh" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            {LEADERBOARD.map((entry, i) => (
+              <div key={i} style={{
+                display: "flex", alignItems: "center", gap: "14px", padding: "16px",
+                background: C.surface, borderRadius: "14px",
+                border: `1px solid ${i === 0 ? C.accent + "30" : C.border}`,
+                animation: `slideIn .4s ease ${i * 0.1}s both`,
+              }}>
+                <div style={{
+                  width: "36px", height: "36px", borderRadius: "50%",
+                  background: i === 0 ? C.accentMuted : i === 1 ? C.purpleMuted : C.surfaceLight,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: "14px", fontWeight: 800, color: i === 0 ? C.accent : i === 1 ? C.purple : C.dim,
+                  border: `2px solid ${i === 0 ? C.accent + "40" : i === 1 ? C.purple + "40" : C.border}`,
+                }}>#{entry.rank}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "2px" }}>
+                    <span style={{ fontSize: "13px", fontWeight: 600, color: C.white, fontFamily: MONO }}>{entry.addr}</span>
+                    <span style={{
+                      fontSize: "9px", padding: "2px 8px", borderRadius: "10px", fontWeight: 600,
+                      background: entry.path === "Dual" ? C.accentMuted : entry.path === "Convince" ? C.purpleMuted : C.orangeMuted,
+                      color: entry.path === "Dual" ? C.accent : entry.path === "Convince" ? C.purple : C.orange,
+                    }}>{entry.path}</span>
+                  </div>
+                  <div style={{ fontSize: "11px", color: C.dim, fontStyle: "italic" }}>{entry.narrative}</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: "16px", fontWeight: 700, color: i === 0 ? C.accent : C.text }}>{entry.points}</div>
+                  <div style={{ fontSize: "9px", color: C.dim }}>points</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ fontFamily: FONT, background: C.bg, minHeight: "100vh" }}>
+      <style>{STYLES}</style>
+
+      {/* Prototype label */}
+      <div style={{ textAlign: "center", padding: "14px 0 4px", fontSize: "11px", color: C.muted }}>
+        GRAND MASTER — INTERACTIVE PROTOTYPE · Click the banner or buttons to explore
+      </div>
+
+      {modal === "convince" && renderConvinceModal()}
+      {modal === "leaderboard" && renderLeaderboardModal()}
+
+      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "8px 32px 60px" }}>
+        {/* Navbar */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 0 24px", borderBottom: `1px solid ${C.border}`, marginBottom: "28px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: `linear-gradient(135deg,${C.accent},${C.purple})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px" }}>🏛️</div>
+            <span style={{ fontSize: "18px", fontWeight: 700, color: C.white }}>Pharos</span>
+            <span style={{ fontSize: "12px", color: C.dim, fontWeight: 500 }}>Airdrop Checker</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div style={{ padding: "8px 16px", background: C.surface, borderRadius: "8px", fontSize: "12px", color: C.dim, fontFamily: MONO }}>0x7a3f...e82d</div>
+            <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: `linear-gradient(135deg,${C.purple},${C.accent})` }} />
+          </div>
+        </div>
+
+        {/* Airdrop summary */}
+        <div style={{ background: C.panel, borderRadius: "20px", padding: "32px", border: `1px solid ${C.border}`, marginBottom: "20px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <div style={{ fontSize: "11px", color: C.dim, fontWeight: 500, letterSpacing: "1.5px", textTransform: "uppercase", marginBottom: "12px" }}>Your Airdrop Allocation</div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
+                <span style={{ fontSize: "48px", fontWeight: 800, color: C.white, lineHeight: 1 }}>2,847</span>
+                <span style={{ fontSize: "20px", fontWeight: 600, color: C.accent }}>$PHRS</span>
+              </div>
+              <div style={{ fontSize: "13px", color: C.dim, marginTop: "8px" }}>Based on your testnet activity, social tasks, and early supporter status</div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: "10px", color: C.dim, marginBottom: "4px" }}>Estimated Value</div>
+              <div style={{ fontSize: "20px", fontWeight: 700, color: C.text }}>TGE Price TBD</div>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
+            {[{ label: "Testnet", value: "1,200", pct: "42%" }, { label: "Social", value: "847", pct: "30%" }, { label: "Early Bonus", value: "800", pct: "28%" }].map((item, i) => (
+              <div key={i} style={{ flex: 1, padding: "14px", background: C.surface, borderRadius: "12px" }}>
+                <div style={{ fontSize: "10px", color: C.dim, marginBottom: "4px" }}>{item.label}</div>
+                <div style={{ fontSize: "16px", fontWeight: 700, color: C.text }}>{item.value}</div>
+              </div>
+            ))}
+          </div>
+          <button style={{ width: "100%", marginTop: "20px", padding: "16px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "12px", cursor: "pointer", color: C.text, fontSize: "15px", fontWeight: 600, fontFamily: FONT }}>
+            Claim 2,847 $PHRS to wallet
+          </button>
+        </div>
+
+        {/* ★ GRAND MASTER BANNER ★ */}
+        <div style={{
+          background: `linear-gradient(135deg,${C.orangeMuted},${C.purpleMuted},${C.accentMuted})`,
+          borderRadius: "20px", padding: "28px 32px", border: `1px solid ${C.accent}20`,
+          position: "relative", overflow: "hidden", marginBottom: "20px",
+          animation: "glowPulse 3s ease infinite",
+        }}>
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg,${C.orange},${C.purple},${C.accent})`, backgroundSize: "200% 100%", animation: "shimmer 3s linear infinite" }} />
+
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+              <div style={{
+                width: "64px", height: "64px", borderRadius: "50%",
+                background: `linear-gradient(135deg,${C.accent}20,${C.purple}20)`,
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: "32px",
+                border: `2px solid ${C.accent}30`, boxShadow: `0 0 24px ${C.accentMuted}`,
+              }}>🏛️</div>
+              <div>
+                <div style={{ fontSize: "20px", fontWeight: 800, color: C.white }}>The Grand Master</div>
+                <div style={{ fontSize: "12px", color: C.dim, marginTop: "2px" }}>AI Agent · Autonomous Airdrop Judge</div>
+              </div>
+            </div>
+            <PoolCounter remaining={poolRemaining} />
+          </div>
+
+          <div style={{ fontSize: "14px", color: C.text, lineHeight: 1.6, marginBottom: "20px", maxWidth: "600px" }}>
+            An AI Agent controls a <span style={{ color: C.accent, fontWeight: 700 }}>${poolRemaining.toLocaleString()} $PROS</span> bonus pool. It decides who gets rewarded.
+            <span style={{ color: C.dim }}> Convince it with words, or prove it with actions.</span>
+          </div>
+
+          <div style={{ display: "flex", gap: "12px" }}>
+            <button onClick={() => { setModal("convince"); setTab("feed"); setChatHistory([]); }} style={{
+              flex: 1, padding: "16px 24px", background: `linear-gradient(135deg,${C.purple},${C.accent})`,
+              border: "none", borderRadius: "14px", cursor: "pointer", color: C.white,
+              fontSize: "14px", fontWeight: 700, fontFamily: FONT,
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+            }}>
+              💬 Convince the Master on 𝕏
+            </button>
+            <button onClick={() => setModal("leaderboard")} style={{
+              flex: 1, padding: "16px 24px", background: C.surface,
+              border: `2px solid ${C.orange}30`, borderRadius: "14px", cursor: "pointer",
+              color: C.orange, fontSize: "14px", fontWeight: 700, fontFamily: FONT,
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+            }}>
+              ⚡ Action Leaderboard
+            </button>
+          </div>
+
+          <div style={{ display: "flex", gap: "24px", marginTop: "16px" }}>
+            {[
+              { icon: "🎤", text: "公开对话，围观即裂变" },
+              { icon: "🔍", text: "AI 实时验证链上数据" },
+              { icon: "📊", text: "动态权重，奖励真实行为" },
+              { icon: "🎁", text: "Surprise rewards 随时触发" },
+            ].map((f, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ fontSize: "13px" }}>{f.icon}</span>
+                <span style={{ fontSize: "11px", color: C.dim }}>{f.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Wallet requirement notice */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: "12px", padding: "16px 20px",
+          background: C.surface, borderRadius: "14px", border: `1px solid ${C.border}`,
+        }}>
+          <span style={{ fontSize: "20px" }}>📱</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: "13px", color: C.text, fontWeight: 600 }}>Both paths require a TopNod Wallet</div>
+            <div style={{ fontSize: "11px", color: C.dim }}>Download the app → bind your 𝕏 account → start earning from the Grand Master</div>
+          </div>
+          <button style={{
+            padding: "10px 20px", background: C.accent, border: "none", borderRadius: "10px",
+            color: C.black, fontSize: "12px", fontWeight: 700, fontFamily: FONT, cursor: "pointer",
+          }}>Download TopNod</button>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "center", gap: "20px", marginTop: "24px" }}>
+          {["Docs", "Community", "Blog", "Support"].map(l => <span key={l} style={{ fontSize: "12px", color: C.muted, cursor: "pointer" }}>{l}</span>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
